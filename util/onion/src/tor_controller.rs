@@ -95,10 +95,20 @@ impl TorController {
             if bootstrap_done {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         }
         info!("Tor server bootstrap done!");
         Ok(())
+    }
+
+    /// Waits asynchronously until the underlying TCP connection to the Tor
+    /// controller is severed (either cleanly closed or due to an I/O error).
+    ///
+    /// Returns `Some(())` when the connection is lost, or `None` if the internal
+    /// notification channel was closed unexpectedly (which should not occur during
+    /// normal operation).
+    pub async fn wait_for_disconnect(self) -> bool {
+        self.inner.wait_for_disconnect().await
     }
 
     /// Add a new v3 onion service to the Tor server.

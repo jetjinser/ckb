@@ -10,7 +10,7 @@ use sha2::Sha256;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 /// Error type for Tor control protocol operations.
 #[derive(Debug, thiserror::Error)]
@@ -108,6 +108,7 @@ struct Response {
 pub struct TorConnection {
     write: OwnedWriteHalf,
     line_rx: mpsc::UnboundedReceiver<String>,
+    disconnect_rx: oneshot::Receiver<()>,
 }
 
 impl TorConnection {
@@ -117,6 +118,7 @@ impl TorConnection {
     pub(crate) fn connect(stream: TcpStream, handle: Handle) -> Self {
         let (read, write) = stream.into_split();
         let (line_tx, line_rx) = mpsc::unbounded_channel();
+        let (disconnect_tx, disconnect_rx) = oneshot::channel();
 
         handle.spawn(async move {
             let mut reader = BufReader::new(read);
@@ -139,9 +141,19 @@ impl TorConnection {
                 }
             }
             drop(line_tx);
+            _ = disconnect_tx.send(());
         });
 
-        TorConnection { write, line_rx }
+        TorConnection {
+            write,
+            line_rx,
+            disconnect_rx,
+        }
+    }
+
+    /// Wait for the underlying TCP connection to close.
+    pub async fn wait_for_disconnect(self) -> bool {
+        self.disconnect_rx.await.is_ok()
     }
 
     /// Load protocol information from the Tor controller.
