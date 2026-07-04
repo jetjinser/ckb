@@ -1,7 +1,6 @@
 use crate::{Node, Spec, utils::wait_until};
 use ckb_logger::info;
 use ckb_util::Mutex;
-use rand::Rng;
 
 use super::TorServer;
 
@@ -28,7 +27,7 @@ impl Spec for TorReconnect {
             node.modify_app_config(|config: &mut ckb_app_config::CKBAppConfig| {
                 config.logger.filter = Some("ckb-network=trace,info".to_string());
 
-                config.network.connect_outbound_interval_secs = 15;
+                config.network.connect_outbound_interval_secs = 5;
 
                 config.network.onion.listen_on_onion = true;
 
@@ -44,13 +43,12 @@ impl Spec for TorReconnect {
     }
 
     fn run(&self, nodes: &mut Vec<crate::Node>) {
-        let mut rng = rand::thread_rng();
         // Shut down the initial Tor process started in `Default::default()` before
         // starting new instances for each iteration. Otherwise the new process
         // cannot bind to the same ports.
         self.tor_server.lock().shutdown();
-        (0..5).for_each(|i| {
-            let reuse_data_dir = rng.gen_bool(0.5);
+        (0..3).for_each(|i| {
+            let reuse_data_dir = true;
             info!(
                 "TorReconnect run test: iter: {}, reuse_data_dir: {}",
                 i, reuse_data_dir

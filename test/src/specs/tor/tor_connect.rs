@@ -27,7 +27,7 @@ impl Spec for TorConnect {
             node.modify_app_config(|config: &mut ckb_app_config::CKBAppConfig| {
                 config.logger.filter = Some("ckb-network=trace,info".to_string());
 
-                config.network.connect_outbound_interval_secs = 15;
+                config.network.connect_outbound_interval_secs = 5;
 
                 config.network.onion.listen_on_onion = true;
 
