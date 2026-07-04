@@ -129,7 +129,7 @@ const fn default_proxy_random_auth() -> bool {
 }
 
 /// Onion related config options
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct OnionConfig {
     // Automatically create Tor onion service
@@ -152,6 +152,20 @@ pub struct OnionConfig {
     // while traffic will be forwarded to `p2p_listen_address`.
     #[serde(default = "default_onion_external_port")]
     pub onion_external_port: u16,
+}
+
+impl Default for OnionConfig {
+    fn default() -> Self {
+        Self {
+            listen_on_onion: false,
+            onion_server: None,
+            p2p_listen_address: None,
+            onion_private_key_path: None,
+            tor_controller: default_tor_controller(),
+            tor_password: None,
+            onion_external_port: default_onion_external_port(),
+        }
+    }
 }
 
 /// By default, use tor controller on "127.0.0.1:9051"
