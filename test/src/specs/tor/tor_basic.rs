@@ -39,7 +39,7 @@ impl Spec for TorServiceContainsPublicAddr {
         let node = &nodes[0];
 
         let rpc_client = node.rpc_client();
-        wait_until(30, || {
+        let has_onion_addr = wait_until(30, || {
             let node_info = rpc_client.local_node_info();
 
             info!(
@@ -61,5 +61,14 @@ impl Spec for TorServiceContainsPublicAddr {
                 .collect();
             !node_onion_addrs.is_empty()
         });
+
+        if !has_onion_addr {
+            node.print_last_500_lines_log(&node.log_path());
+        }
+
+        assert!(
+            has_onion_addr,
+            "node should have an onion address within 30 seconds"
+        );
     }
 }

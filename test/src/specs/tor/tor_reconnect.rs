@@ -45,6 +45,10 @@ impl Spec for TorReconnect {
 
     fn run(&self, nodes: &mut Vec<crate::Node>) {
         let mut rng = rand::thread_rng();
+        // Shut down the initial Tor process started in `Default::default()` before
+        // starting new instances for each iteration. Otherwise the new process
+        // cannot bind to the same ports.
+        self.tor_server.lock().shutdown();
         (0..5).for_each(|i| {
             let reuse_data_dir = rng.gen_bool(0.5);
             info!(

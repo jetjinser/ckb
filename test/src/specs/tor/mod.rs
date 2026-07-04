@@ -1,22 +1,18 @@
-mod tor_basic;
-mod tor_connect;
-mod tor_hash_password;
-mod tor_reconnect;
+use crate::utils::find_available_port;
+use ckb_async_runtime::Handle;
 use ckb_async_runtime::Runtime;
 use ckb_logger::{error, info};
 use std::{path::Path, process::Child};
 use tempfile::{TempDir, tempdir};
+
+mod tor_basic;
+mod tor_connect;
+mod tor_hash_password;
+mod tor_reconnect;
 pub use tor_basic::*;
 pub use tor_connect::*;
 pub use tor_hash_password::*;
 pub use tor_reconnect::*;
-
-use crate::{global::obfs4proxy_binary, utils::find_available_port};
-
-// Tor bridge:
-const TOR_BRIDGES: &[&str] = &[
-    "obfs4 [2605:6400:10:ea:fe01:dc20:ba03:4ff]:443 886CA31F71272FC8B3808C601FA3ABB8A2905DB4 cert=D+zypuFdMpP8riBUbInxIguzqClR0JKkP1DbkKz5es1+OP2Fao8jiXyM+B/+DYA2ZFy6UA iat-mode=0",
-];
 
 #[derive(Debug)]
 struct TorServer {
@@ -49,18 +45,26 @@ impl TorServer {
             }
         }
     }
+
     pub fn tor_wait_bootstrap_done(&self) {
         let tor_controller_url = format!("127.0.0.1:{}", self.control_port);
         let controller_password = self.controller_password.clone();
-        Runtime::new().unwrap().block_on(async {
-            let tor_controller =
-                ckb_onion::TorController::new(tor_controller_url, controller_password, None).await;
+        let runtime = Runtime::new().unwrap();
+        let handle = Handle::new(runtime.handle().clone(), None);
+        runtime.block_on(async {
+            let tor_controller = ckb_onion::TorController::new(
+                tor_controller_url,
+                controller_password,
+                handle.clone(),
+            )
+            .await;
             let mut tor_controller = tor_controller.unwrap();
             if let Err(err) = tor_controller.wait_tor_server_bootstrap_done().await {
                 error!("wait tor server bootstrap done error: {:?}", err);
             };
         });
     }
+
     pub fn new(controller_password: Option<String>) -> Self {
         let tor_command_path = std::option_env!("TOR_COMMAND_PATH")
             .unwrap_or("tor")
@@ -76,23 +80,6 @@ impl TorServer {
         let tor_process = tor_server.tor_start(false);
         tor_server.tor_process = Some(tor_process);
         tor_server
-    }
-
-    fn tor_bridge_args(&self) -> Vec<String> {
-        let mut bridges = Vec::new();
-        for bridge in TOR_BRIDGES {
-            bridges.push("--Bridge".to_string());
-            bridges.push(bridge.to_string());
-        }
-        vec![
-            "--UseBridges".to_string(),
-            "1".to_string(),
-            "--ClientTransportPlugin".to_string(),
-            format!("obfs4 exec {}", obfs4proxy_binary().display()),
-        ]
-        .into_iter()
-        .chain(bridges)
-        .collect()
     }
 
     fn tor_hashed_control_password_args(&self) -> Vec<String> {
@@ -119,14 +106,10 @@ impl TorServer {
     }
 
     fn build_tor_args(&self, data_dir: &Path) -> Vec<String> {
-        let args: Vec<String> = self
-            .tor_base_args(data_dir)
+        self.tor_base_args(data_dir)
             .into_iter()
-            .chain(self.tor_bridge_args())
             .chain(self.tor_hashed_control_password_args())
-            .collect();
-        info!("{}", args.join(" "));
-        args
+            .collect()
     }
 
     fn tor_start(&mut self, reuse_data_dir: bool) -> Child {

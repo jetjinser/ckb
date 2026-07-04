@@ -216,9 +216,7 @@ pub fn main_test() {
                 spec_name,
                 seconds,
                 node_log_paths,
-                // node_paths is ignored here to let TempPathBuf handle
-                // automatic directory cleanup when this scope ends.
-                ..
+                node_paths,
             } => {
                 test_results.push(TestResult {
                     spec_name: spec_name.clone(),
@@ -237,13 +235,17 @@ pub fn main_test() {
                     info!("[{}] Error", spec_name);
                     tail_node_logs(&node_log_paths);
                 }
+                if !clean_tmp {
+                    for path in node_paths {
+                        std::mem::forget(path);
+                    }
+                }
             }
             Notify::Panick {
                 spec_name,
                 seconds,
                 node_log_paths,
-                // same as above
-                ..
+                node_paths,
             } => {
                 test_results.push(TestResult {
                     spec_name: spec_name.clone(),
@@ -261,6 +263,11 @@ pub fn main_test() {
                 if verbose {
                     info!("[{}] Panic", spec_name);
                     print_panicked_logs(&node_log_paths);
+                }
+                if !clean_tmp {
+                    for path in node_paths {
+                        std::mem::forget(path);
+                    }
                 }
             }
             Notify::Done {
@@ -284,6 +291,10 @@ pub fn main_test() {
                         if let Err(err) = fs::remove_dir_all(&path) {
                             warn!("failed to remove directory [{:?}] since {}", path, err);
                         }
+                    }
+                } else {
+                    for path in node_paths {
+                        std::mem::forget(path);
                     }
                 }
             }
@@ -660,6 +671,10 @@ fn all_specs() -> Vec<Box<dyn Spec>> {
         Box::new(CheckVmBExtension),
         Box::new(RandomlyKill),
         Box::new(SyncChurn),
+        Box::<crate::specs::TorServiceContainsPublicAddr>::default(),
+        Box::<crate::specs::TorHashPasswordConnect>::default(),
+        Box::<crate::specs::TorConnect>::default(),
+        Box::<crate::specs::TorReconnect>::default(),
     ];
     specs.shuffle(&mut thread_rng());
     specs
