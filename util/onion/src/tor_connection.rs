@@ -323,16 +323,24 @@ impl TorConnection {
         let (server_hash, server_nonce) = parse_auth_challenge_response(&resp.lines)?;
 
         let server_hash_expected = hmac_sha256(
-            b"Tor safe cookie authentication server-to-controller hash",
-            &[cookie, &client_nonce, &server_nonce],
+            cookie,
+            &[
+                b"Tor safe cookie authentication server-to-controller hash",
+                &client_nonce,
+                &server_nonce,
+            ],
         )?;
         if server_hash_expected != server_hash {
             return Err(ConnError::AuthFailed);
         }
 
         let client_hash = hmac_sha256(
-            b"Tor safe cookie authentication controller-to-server hash",
-            &[cookie, &client_nonce, &server_nonce],
+            cookie,
+            &[
+                b"Tor safe cookie authentication controller-to-server hash",
+                &client_nonce,
+                &server_nonce,
+            ],
         )?;
 
         self.send_command(&format!(
